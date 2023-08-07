@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.16;
 
-interface IBridge {
+interface IBridgeSwap {
     // ===================================================== Errors =====================================================
 
     error SameToken();
@@ -39,13 +39,15 @@ interface IBridge {
         address tokenA,
         address tokenB,
         uint256 amountA,
-        uint256 amountB
+        uint256 amountB,
+        address to
     ) external returns (uint256 share);
 
     function addLiquidity(
         address tokenA,
         address tokenB,
         uint256 amountA,
-        uint256 amountB
+        uint256 amountB,
+        address to
     ) external returns (uint256 share);
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.16;
 
-import "./interfaces/IBridge.sol";
+import "./interfaces/IBridgeSwap.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -14,7 +14,7 @@ struct Pool {
     uint256 amount1;
 }
 
-contract Bridge is IBridge, ERC1155Supply, ReentrancyGuard {
+contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard {
     constructor() ERC1155("") {}
 
     Pool[] poolList;
@@ -77,7 +77,8 @@ contract Bridge is IBridge, ERC1155Supply, ReentrancyGuard {
         address tokenA,
         address tokenB,
         uint256 amountA,
-        uint256 amountB
+        uint256 amountB,
+        address to
     ) public nonReentrant returns (uint256 share) {
         if (tokenA == tokenB) revert SameToken();
         if (isPoolExists[tokenA][tokenB]) revert PoolExists();
@@ -111,7 +112,7 @@ contract Bridge is IBridge, ERC1155Supply, ReentrancyGuard {
 
         share = Math.sqrt(amountA * amountB);
 
-        mint(msg.sender, poolList.length - 1, share, "init pool");
+        mint(to, poolList.length - 1, share, "init pool");
     }
 
     /**
@@ -125,11 +126,12 @@ contract Bridge is IBridge, ERC1155Supply, ReentrancyGuard {
         address tokenA,
         address tokenB,
         uint256 amountA,
-        uint256 amountB
+        uint256 amountB,
+        address to
     ) public nonReentrant returns (uint256 share) {
         if (tokenA == tokenB) revert SameToken();
         if (!isPoolExists[tokenA][tokenB]) {
-            share = initPool(tokenA, tokenB, amountA, amountB);
+            share = initPool(tokenA, tokenB, amountA, amountB, to);
         } else {
             uint256 index = poolIndex[tokenA][tokenB];
 
@@ -155,9 +157,11 @@ contract Bridge is IBridge, ERC1155Supply, ReentrancyGuard {
                 targetPool.amount1 += amountA;
             }
 
-            mint(msg.sender, index, share, "add liquidity");
+            mint(to, index, share, "add liquidity");
         }
     }
+
+    // TODO: Swap Function
 
     // ===================================================== ERC-1155 Functions =====================================================
 
