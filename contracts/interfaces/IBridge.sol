@@ -13,7 +13,7 @@ interface IBridge {
     function addReserve(address token, uint256 amount) external;
 
     event BridgeIn(
-        address indexed operator,
+        address indexed receiver,
         address indexed token,
         uint256 amount
     );
