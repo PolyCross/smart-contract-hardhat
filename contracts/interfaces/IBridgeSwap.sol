@@ -6,14 +6,21 @@ interface IBridgeSwap {
 
     error SameToken();
     error PoolExists();
+    error InvalidPath();
+    error InvalidSlippage();
 
     // ===================================================== Events =====================================================
 
-    event BridgeTransfer(address indexed token, uint256 amount);
-    event BridgeSwap(
-        address indexed fromToken,
-        address indexed toToken,
-        uint256 amount
+    event BridgeSwapIn(
+        address[] path,
+        uint256 amountIn,
+        address indexed receiver
+    );
+
+    event BridgeSwapOut(
+        address[] path,
+        uint256 amountIn,
+        address indexed receiver
     );
 
     // ===================================================== Read Functions =====================================================

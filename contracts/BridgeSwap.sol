@@ -2,19 +2,21 @@
 pragma solidity ^0.8.16;
 
 import "./interfaces/IBridgeSwap.sol";
+import "./libraries/BridgeSwapLibrary.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 struct Pool {
     address token0;
     address token1;
-    uint256 amount0;
-    uint256 amount1;
+    uint256 reserve0;
+    uint256 reserve1;
 }
 
-contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard {
+contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
     constructor() ERC1155("") {}
 
     Pool[] poolList;
@@ -37,8 +39,8 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard {
      * @param tokenB tokenB address
      * @return token0 token0 address
      * @return token1 token1 address
-     * @return amount0 token0 amount
-     * @return amount1 token1 amount
+     * @return reserve0 token0 amount
+     * @return reserve1 token1 amount
      */
     function getPoolInfo(
         address tokenA,
@@ -49,18 +51,18 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard {
         returns (
             address token0,
             address token1,
-            uint256 amount0,
-            uint256 amount1
+            uint256 reserve0,
+            uint256 reserve1
         )
     {
         if (!isPoolExists[tokenA][tokenB]) revert("Pool doesn't exist");
         uint256 index = poolIndex[tokenA][tokenB];
         Pool memory targetPool = poolList[index];
-        (token0, token1, amount0, amount1) = (
+        (token0, token1, reserve0, reserve1) = (
             targetPool.token0,
             targetPool.token1,
-            targetPool.amount0,
-            targetPool.amount1
+            targetPool.reserve0,
+            targetPool.reserve1
         );
     }
 
@@ -93,16 +95,16 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard {
             Pool memory newPool = Pool({
                 token0: tokenA,
                 token1: tokenB,
-                amount0: amountA,
-                amount1: amountB
+                reserve0: amountA,
+                reserve1: amountB
             });
             poolList.push(newPool);
         } else {
             Pool memory newPool = Pool({
                 token0: tokenB,
                 token1: tokenA,
-                amount0: amountB,
-                amount1: amountA
+                reserve0: amountB,
+                reserve1: amountA
             });
             poolList.push(newPool);
         }
@@ -143,25 +145,105 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard {
 
             if (tokenA < tokenB) {
                 share = Math.min(
-                    (amountA * _totalSupply) / targetPool.amount0,
-                    (amountB * _totalSupply) / targetPool.amount1
+                    (amountA * _totalSupply) / targetPool.reserve0,
+                    (amountB * _totalSupply) / targetPool.reserve1
                 );
-                targetPool.amount0 += amountA;
-                targetPool.amount1 += amountB;
+                targetPool.reserve0 += amountA;
+                targetPool.reserve1 += amountB;
             } else {
                 share = Math.min(
-                    (amountB * _totalSupply) / targetPool.amount0,
-                    (amountA * _totalSupply) / targetPool.amount1
+                    (amountB * _totalSupply) / targetPool.reserve0,
+                    (amountA * _totalSupply) / targetPool.reserve1
                 );
-                targetPool.amount0 += amountB;
-                targetPool.amount1 += amountA;
+                targetPool.reserve0 += amountB;
+                targetPool.reserve1 += amountA;
             }
 
             mint(to, index, share, "add liquidity");
         }
     }
 
-    // TODO: Swap Function
+    /**
+     * @dev swap exact tokens for tokens
+     * @notice user op
+     * @param amountIn the amount of token to swap
+     * @param amountOutMin the expected minimum amount of tokens to be received
+     * @param path token array
+     * @return amounts the array of token out amount
+     */
+    function SwapIn(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path
+    ) public returns (uint256[] memory amounts) {
+        if (path.length < 2) revert InvalidPath();
+        IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
+        amounts = _swap(amountIn, path);
+        if (amounts[amounts.length - 1] < amountOutMin)
+            revert InvalidSlippage();
+
+        emit BridgeSwapIn(path, amountIn, msg.sender);
+    }
+
+    /**
+     * @dev swap exact tokens for tokens
+     * @notice admin op
+     * @param amountIn the amount of token to swap
+     * @param path token array
+     * @param to the receiver address
+     */
+    function SwapOut(
+        uint256 amountIn,
+        address[] calldata path,
+        address to
+    ) public onlyOwner returns (uint256[] memory amounts) {
+        if (path.length < 2) revert InvalidPath();
+        IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
+        amounts = _swap(amountIn, path);
+        IERC20(path[path.length - 1]).transfer(to, amounts[amounts.length - 1]);
+
+        emit BridgeSwapOut(path, amountIn, to);
+    }
+
+    /**
+     * @dev helper swap function
+     * @param amountIn the amount of token to swap
+     * @param path token array
+     */
+    function _swap(
+        uint256 amountIn,
+        address[] calldata path
+    ) private returns (uint256[] memory amounts) {
+        amounts = new uint256[](path.length);
+        amounts[0] = amountIn;
+        for (uint i; i < path.length - 1; i++) {
+            address tokenA = path[i];
+            address tokenB = path[i + 1];
+            if (!isPoolExists[tokenA][tokenB]) revert InvalidPath();
+            uint256 index = poolIndex[tokenA][tokenB];
+            Pool storage temp = poolList[index];
+
+            uint256 temp_amountOut;
+            if (tokenA < tokenB) {
+                temp_amountOut = BridgeSwapLibrary.getAmountOut(
+                    amounts[i],
+                    temp.reserve0,
+                    temp.reserve1
+                );
+                temp.reserve0 += amounts[i];
+                temp.reserve1 -= temp_amountOut;
+            } else {
+                temp_amountOut = BridgeSwapLibrary.getAmountOut(
+                    amounts[i],
+                    temp.reserve1,
+                    temp.reserve0
+                );
+                temp.reserve1 += amounts[i];
+                temp.reserve0 -= temp_amountOut;
+            }
+            amounts[i + 1] = temp_amountOut;
+        }
+    }
 
     // ===================================================== ERC-1155 Functions =====================================================
 
