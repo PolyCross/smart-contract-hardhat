@@ -5,7 +5,6 @@ import "./interfaces/IBridgeSwap.sol";
 import "./libraries/BridgeSwapLibrary.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -16,12 +15,12 @@ struct Pool {
     uint256 reserve1;
 }
 
-contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
+contract BridgeSwap is IBridgeSwap, ERC1155Supply, Ownable {
     constructor() ERC1155("") {}
 
     Pool[] poolList;
     mapping(address => mapping(address => bool)) public isPoolExists;
-    mapping(address => mapping(address => uint)) poolIndex;
+    mapping(address => mapping(address => uint256)) poolIndex;
 
     // ===================================================== Read Functions =====================================================
 
@@ -35,12 +34,12 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
 
     /**
      * @dev get the reserve of pool
-     * @param tokenA tokenA address
-     * @param tokenB tokenB address
-     * @return token0 token0 address
-     * @return token1 token1 address
-     * @return reserve0 token0 amount
-     * @return reserve1 token1 amount
+     * @param tokenA address of tokenA
+     * @param tokenB address of tokenB
+     * @return token0 address of token0
+     * @return token1 address of token0
+     * @return reserve0 amount of token0
+     * @return reserve1 amount of token1
      */
     function getPoolInfo(
         address tokenA,
@@ -70,10 +69,10 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
 
     /**
      * @dev init liquidity pool
-     * @param tokenA tokenA address
-     * @param tokenB tokenB address
-     * @param amountA tokenA amount
-     * @param amountB tokenB amount
+     * @param tokenA address of tokenA
+     * @param tokenB address of tokenB
+     * @param amountA amount of tokenA
+     * @param amountB amount of tokenB
      */
     function initPool(
         address tokenA,
@@ -81,7 +80,7 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
         uint256 amountA,
         uint256 amountB,
         address to
-    ) public nonReentrant returns (uint256 share) {
+    ) public returns (uint256 share) {
         if (tokenA == tokenB) revert SameToken();
         if (isPoolExists[tokenA][tokenB]) revert PoolExists();
 
@@ -114,15 +113,15 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
 
         share = Math.sqrt(amountA * amountB);
 
-        mint(to, poolList.length - 1, share, "init pool");
+        _mint(to, poolList.length - 1, share, "");
     }
 
     /**
      * @dev add liquidity
-     * @param tokenA tokenA address
-     * @param tokenB tokenB address
-     * @param amountA tokenA amount
-     * @param amountB tokenB amount
+     * @param tokenA address of tokenA
+     * @param tokenB address of tokenB
+     * @param amountA amount of tokenA
+     * @param amountB amount of tokenB
      */
     function addLiquidity(
         address tokenA,
@@ -130,7 +129,7 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
         uint256 amountA,
         uint256 amountB,
         address to
-    ) public nonReentrant returns (uint256 share) {
+    ) public returns (uint256 share) {
         if (tokenA == tokenB) revert SameToken();
         if (!isPoolExists[tokenA][tokenB]) {
             share = initPool(tokenA, tokenB, amountA, amountB, to);
@@ -159,7 +158,7 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
                 targetPool.reserve1 += amountA;
             }
 
-            mint(to, index, share, "add liquidity");
+            _mint(to, index, share, "");
         }
     }
 
@@ -171,12 +170,11 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
      * @param path token array
      * @return amounts the array of token out amount
      */
-    function SwapIn(
+    function swapIn(
         uint256 amountIn,
         uint256 amountOutMin,
         address[] calldata path
     ) public returns (uint256[] memory amounts) {
-        if (path.length < 2) revert InvalidPath();
         IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
         amounts = _swap(amountIn, path);
         if (amounts[amounts.length - 1] < amountOutMin)
@@ -192,12 +190,11 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
      * @param path token array
      * @param to the receiver address
      */
-    function SwapOut(
+    function swapOut(
         uint256 amountIn,
         address[] calldata path,
         address to
     ) public onlyOwner returns (uint256[] memory amounts) {
-        if (path.length < 2) revert InvalidPath();
         IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
         amounts = _swap(amountIn, path);
         IERC20(path[path.length - 1]).transfer(to, amounts[amounts.length - 1]);
@@ -214,12 +211,13 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
         uint256 amountIn,
         address[] calldata path
     ) private returns (uint256[] memory amounts) {
+        if (path.length < 2) revert InvalidPath();
         amounts = new uint256[](path.length);
         amounts[0] = amountIn;
         for (uint i; i < path.length - 1; i++) {
             address tokenA = path[i];
             address tokenB = path[i + 1];
-            if (!isPoolExists[tokenA][tokenB]) revert InvalidPath();
+            if (!isPoolExists[tokenA][tokenB]) revert PoolNotExist();
             uint256 index = poolIndex[tokenA][tokenB];
             Pool storage temp = poolList[index];
 
@@ -245,14 +243,31 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, ReentrancyGuard, Ownable {
         }
     }
 
-    // ===================================================== ERC-1155 Functions =====================================================
+    /**
+     * @dev remove the liquidity
+     * @param tokenA address of tokenA
+     * @param tokenB address of tokenB
+     * @param liquidity the liquidity amount to remove
+     * @param to the receiver
+     */
+    function removeLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 liquidity,
+        address to
+    ) public returns (uint256 amount0, uint256 amount1) {
+        if (!isPoolExists[tokenA][tokenB]) revert PoolNotExist();
+        uint256 index = poolIndex[tokenA][tokenB];
+        _burn(msg.sender, index, liquidity);
 
-    function mint(
-        address to,
-        uint256 index,
-        uint256 amount,
-        bytes memory data
-    ) private {
-        _mint(to, index, amount, data);
+        Pool storage targetPool = poolList[index];
+        uint256 total = totalSupply(index);
+        amount0 = (targetPool.reserve0 * liquidity) / total;
+        amount1 = (targetPool.reserve1 * liquidity) / total;
+        targetPool.reserve0 -= amount0;
+        targetPool.reserve1 -= amount1;
+
+        IERC20(targetPool.token0).transfer(to, amount0);
+        IERC20(targetPool.token1).transfer(to, amount1);
     }
 }

@@ -6,6 +6,7 @@ interface IBridgeSwap {
 
     error SameToken();
     error PoolExists();
+    error PoolNotExist();
     error InvalidPath();
     error InvalidSlippage();
 
@@ -57,4 +58,23 @@ interface IBridgeSwap {
         uint256 amountB,
         address to
     ) external returns (uint256 share);
+
+    function swapIn(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path
+    ) external returns (uint256[] memory amounts);
+
+    function swapOut(
+        uint256 amountIn,
+        address[] calldata path,
+        address to
+    ) external returns (uint256[] memory amounts);
+
+    function removeLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 liquidity,
+        address to
+    ) external returns (uint256 amount0, uint256 amount1);
 }
