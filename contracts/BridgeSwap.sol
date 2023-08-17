@@ -4,9 +4,9 @@ pragma solidity ^0.8.16;
 import "./interfaces/IBridgeSwap.sol";
 import "./libraries/BridgeSwapLibrary.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 struct Pool {
     address token0;
@@ -15,8 +15,11 @@ struct Pool {
     uint256 reserve1;
 }
 
-contract BridgeSwap is IBridgeSwap, ERC1155Supply, Ownable {
-    constructor() ERC1155("") {}
+contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable {
+    function Initialize() initializer public {
+        __ERC1155_init("");
+        __Ownable_init();
+    }
 
     Pool[] poolList;
     mapping(address => mapping(address => bool)) public isPoolExists;
