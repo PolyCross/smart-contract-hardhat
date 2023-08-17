@@ -65,6 +65,45 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, Ownable {
         );
     }
 
+    /**
+     * @dev calculating the amount of tokens that can be obtained based on the input amount and path.
+     * @param amountIn the amount of token to swap
+     * @param path token array
+     */
+    function calculateAmountOut(
+        uint256 amountIn,
+        address[] calldata path
+    ) public view returns (uint256) {
+        if (path.length < 2) revert InvalidPath();
+        uint256[] memory amounts = new uint256[](path.length);
+        amounts[0] = amountIn;
+
+        for (uint i; i < path.length - 1; i++) {
+            address tokenA = path[i];
+            address tokenB = path[i + 1];
+
+            if (!isPoolExists[tokenA][tokenB]) revert PoolNotExist();
+
+            uint256 index = poolIndex[tokenA][tokenB];
+            Pool memory temp = poolList[index];
+
+            uint256 reserve0 = temp.reserve0;
+            uint256 reserve1 = temp.reserve1;
+
+            uint256 temp_amountOut = tokenA < tokenB
+                ? BridgeSwapLibrary.getAmountOut(amounts[i], reserve0, reserve1)
+                : BridgeSwapLibrary.getAmountOut(
+                    amounts[i],
+                    reserve0,
+                    reserve1
+                );
+
+            amounts[i + 1] = temp_amountOut;
+        }
+
+        return amounts[amounts.length - 1];
+    }
+
     // ===================================================== Write Functions =====================================================
 
     /**

@@ -41,6 +41,11 @@ interface IBridgeSwap {
             uint256 amount1
         );
 
+    function calculateAmountOut(
+        uint256 amountIn,
+        address[] calldata path
+    ) external view returns (uint256);
+
     // ===================================================== Write Functions =====================================================
 
     function initPool(
