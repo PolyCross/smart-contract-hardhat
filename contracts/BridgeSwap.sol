@@ -90,23 +90,21 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, Ownable {
         IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
         IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
 
-        if (tokenA < tokenB) {
-            Pool memory newPool = Pool({
+        Pool memory newPool = tokenA < tokenB
+            ? Pool({
                 token0: tokenA,
                 token1: tokenB,
                 reserve0: amountA,
                 reserve1: amountB
-            });
-            poolList.push(newPool);
-        } else {
-            Pool memory newPool = Pool({
+            })
+            : Pool({
                 token0: tokenB,
                 token1: tokenA,
                 reserve0: amountB,
                 reserve1: amountA
             });
-            poolList.push(newPool);
-        }
+
+        poolList.push(newPool);
 
         isPoolExists[tokenA][tokenB] = true;
         isPoolExists[tokenB][tokenA] = true;
@@ -142,17 +140,20 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, Ownable {
             Pool storage targetPool = poolList[index];
             uint256 _totalSupply = totalSupply(index);
 
+            uint256 reserve0 = targetPool.reserve0;
+            uint256 reserve1 = targetPool.reserve1;
+
             if (tokenA < tokenB) {
                 share = Math.min(
-                    (amountA * _totalSupply) / targetPool.reserve0,
-                    (amountB * _totalSupply) / targetPool.reserve1
+                    (amountA * _totalSupply) / reserve0,
+                    (amountB * _totalSupply) / reserve1
                 );
                 targetPool.reserve0 += amountA;
                 targetPool.reserve1 += amountB;
             } else {
                 share = Math.min(
-                    (amountB * _totalSupply) / targetPool.reserve0,
-                    (amountA * _totalSupply) / targetPool.reserve1
+                    (amountB * _totalSupply) / reserve0,
+                    (amountA * _totalSupply) / reserve1
                 );
                 targetPool.reserve0 += amountB;
                 targetPool.reserve1 += amountA;
@@ -214,27 +215,33 @@ contract BridgeSwap is IBridgeSwap, ERC1155Supply, Ownable {
         if (path.length < 2) revert InvalidPath();
         amounts = new uint256[](path.length);
         amounts[0] = amountIn;
+
         for (uint i; i < path.length - 1; i++) {
             address tokenA = path[i];
             address tokenB = path[i + 1];
+
             if (!isPoolExists[tokenA][tokenB]) revert PoolNotExist();
+
             uint256 index = poolIndex[tokenA][tokenB];
             Pool storage temp = poolList[index];
 
             uint256 temp_amountOut;
+            uint256 reserve0 = temp.reserve0;
+            uint256 reserve1 = temp.reserve1;
+
             if (tokenA < tokenB) {
                 temp_amountOut = BridgeSwapLibrary.getAmountOut(
                     amounts[i],
-                    temp.reserve0,
-                    temp.reserve1
+                    reserve0,
+                    reserve1
                 );
                 temp.reserve0 += amounts[i];
                 temp.reserve1 -= temp_amountOut;
             } else {
                 temp_amountOut = BridgeSwapLibrary.getAmountOut(
                     amounts[i],
-                    temp.reserve1,
-                    temp.reserve0
+                    reserve1,
+                    reserve0
                 );
                 temp.reserve1 += amounts[i];
                 temp.reserve0 -= temp_amountOut;
