@@ -17,13 +17,12 @@ contract Bridge is IBridge, Ownable {
      */
     function bridgeIn(
         address token,
-        uint256 amount,
-        address receiver
+        uint256 amount
     ) public checkTokenSupport(token) {
         IERC20(token).transferFrom(msg.sender, address(this), amount);
         reserve[token] -= amount;
 
-        emit BridgeIn(receiver, token, amount);
+        emit BridgeIn(msg.sender, token, amount);
     }
 
     /**

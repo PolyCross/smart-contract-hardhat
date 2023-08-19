@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 interface IBridge {
     error TokenNotSupport();
 
-    function bridgeIn(address token, uint256 amount, address operator) external;
+    function bridgeIn(address token, uint256 amount) external;
 
     function bridgeOut(address token, uint256 amount, address to) external;
 
