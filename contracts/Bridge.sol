@@ -49,7 +49,7 @@ contract Bridge is IBridge, Ownable {
      * @param token new supported token address
      */
     function supportNewToken(address token) public onlyOwner {
-        if (isSupported[token]) revert("Token Already Supported");
+        if (isSupported[token]) revert TokenAlreadySupport();
         isSupported[token] = true;
     }
 
