@@ -12,6 +12,22 @@ interface IBridgeSwap {
 
     // ===================================================== Events =====================================================
 
+    event AddLiquidty(
+        address account,
+        address token0,
+        address token1,
+        uint256 share,
+        address to
+    );
+
+    event RemoveLiquidity(
+        address account,
+        address tokenA,
+        address tokenB,
+        uint256 liquidity,
+        address to
+    );
+
     event BridgeSwapIn(
         address[] path,
         uint256 amountIn,
@@ -47,14 +63,6 @@ interface IBridgeSwap {
     ) external view returns (uint256);
 
     // ===================================================== Write Functions =====================================================
-
-    function initPool(
-        address tokenA,
-        address tokenB,
-        uint256 amountA,
-        uint256 amountB,
-        address to
-    ) external returns (uint256 share);
 
     function addLiquidity(
         address tokenA,

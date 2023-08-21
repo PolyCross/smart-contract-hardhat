@@ -15,8 +15,12 @@ struct Pool {
     uint256 reserve1;
 }
 
-contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable {
-    function Initialize() initializer public {
+contract BridgeSwap is
+    IBridgeSwap,
+    ERC1155SupplyUpgradeable,
+    OwnableUpgradeable
+{
+    function Initialize() public initializer {
         __ERC1155_init("");
         __Ownable_init();
     }
@@ -57,7 +61,7 @@ contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable
             uint256 reserve1
         )
     {
-        if (!isPoolExists[tokenA][tokenB]) revert("Pool doesn't exist");
+        if (!isPoolExists[tokenA][tokenB]) revert PoolNotExist();
         uint256 index = poolIndex[tokenA][tokenB];
         Pool memory targetPool = poolList[index];
         (token0, token1, reserve0, reserve1) = (
@@ -110,53 +114,6 @@ contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable
     // ===================================================== Write Functions =====================================================
 
     /**
-     * @dev init liquidity pool
-     * @param tokenA address of tokenA
-     * @param tokenB address of tokenB
-     * @param amountA amount of tokenA
-     * @param amountB amount of tokenB
-     */
-    function initPool(
-        address tokenA,
-        address tokenB,
-        uint256 amountA,
-        uint256 amountB,
-        address to
-    ) public returns (uint256 share) {
-        if (tokenA == tokenB) revert SameToken();
-        if (isPoolExists[tokenA][tokenB]) revert PoolExists();
-
-        poolIndex[tokenA][tokenB] = poolList.length;
-        poolIndex[tokenB][tokenA] = poolList.length;
-
-        IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
-        IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
-
-        Pool memory newPool = tokenA < tokenB
-            ? Pool({
-                token0: tokenA,
-                token1: tokenB,
-                reserve0: amountA,
-                reserve1: amountB
-            })
-            : Pool({
-                token0: tokenB,
-                token1: tokenA,
-                reserve0: amountB,
-                reserve1: amountA
-            });
-
-        poolList.push(newPool);
-
-        isPoolExists[tokenA][tokenB] = true;
-        isPoolExists[tokenB][tokenA] = true;
-
-        share = Math.sqrt(amountA * amountB);
-
-        _mint(to, poolList.length - 1, share, "");
-    }
-
-    /**
      * @dev add liquidity
      * @param tokenA address of tokenA
      * @param tokenB address of tokenB
@@ -169,15 +126,24 @@ contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable
         uint256 amountA,
         uint256 amountB,
         address to
-    ) public returns (uint256 share) {
-        if (tokenA == tokenB) revert SameToken();
-        if (!isPoolExists[tokenA][tokenB]) {
-            share = initPool(tokenA, tokenB, amountA, amountB, to);
-        } else {
-            uint256 index = poolIndex[tokenA][tokenB];
+    ) public checkSameToken(tokenA, tokenB) returns (uint256 share) {
+        IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
+        IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
 
-            IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
-            IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
+        (
+            address token0,
+            address token1,
+            uint256 amount0,
+            uint256 amount1
+        ) = BridgeSwapLibrary.sortTokenWithAmount(
+                tokenA,
+                tokenB,
+                amountA,
+                amountB
+            );
+
+        if (isPoolExists[tokenA][tokenB]) {
+            uint256 index = poolIndex[tokenA][tokenB];
 
             Pool storage targetPool = poolList[index];
             uint256 _totalSupply = totalSupply(index);
@@ -185,24 +151,36 @@ contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable
             uint256 reserve0 = targetPool.reserve0;
             uint256 reserve1 = targetPool.reserve1;
 
-            if (tokenA < tokenB) {
-                share = Math.min(
-                    (amountA * _totalSupply) / reserve0,
-                    (amountB * _totalSupply) / reserve1
-                );
-                targetPool.reserve0 += amountA;
-                targetPool.reserve1 += amountB;
-            } else {
-                share = Math.min(
-                    (amountB * _totalSupply) / reserve0,
-                    (amountA * _totalSupply) / reserve1
-                );
-                targetPool.reserve0 += amountB;
-                targetPool.reserve1 += amountA;
-            }
+            share = Math.min(
+                (amount0 * _totalSupply) / reserve0,
+                (amount1 * _totalSupply) / reserve1
+            );
+            targetPool.reserve0 += amount0;
+            targetPool.reserve1 += amount1;
 
             _mint(to, index, share, "");
+        } else {
+            poolIndex[tokenA][tokenB] = poolList.length;
+            poolIndex[tokenB][tokenA] = poolList.length;
+
+            _mint(to, poolList.length, share, "");
+
+            Pool memory newPool = Pool({
+                token0: token0,
+                token1: token1,
+                reserve0: amount0,
+                reserve1: amount1
+            });
+
+            poolList.push(newPool);
+
+            isPoolExists[tokenA][tokenB] = true;
+            isPoolExists[tokenB][tokenA] = true;
+
+            share = Math.sqrt(amountA * amountB);
         }
+
+        emit AddLiquidty(msg.sender, token0, token1, share, to);
     }
 
     /**
@@ -304,7 +282,11 @@ contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable
         address tokenB,
         uint256 liquidity,
         address to
-    ) public returns (uint256 amount0, uint256 amount1) {
+    )
+        public
+        checkSameToken(tokenA, tokenB)
+        returns (uint256 amount0, uint256 amount1)
+    {
         if (!isPoolExists[tokenA][tokenB]) revert PoolNotExist();
         uint256 index = poolIndex[tokenA][tokenB];
 
@@ -319,5 +301,12 @@ contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable
 
         IERC20(targetPool.token0).transfer(to, amount0);
         IERC20(targetPool.token1).transfer(to, amount1);
+
+        emit RemoveLiquidity(msg.sender, tokenA, tokenB, liquidity, to);
+    }
+
+    modifier checkSameToken(address tokenA, address tokenB) {
+        if (tokenA == tokenB) revert SameToken();
+        _;
     }
 }
