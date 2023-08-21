@@ -163,6 +163,8 @@ contract BridgeSwap is
             poolIndex[tokenA][tokenB] = poolList.length;
             poolIndex[tokenB][tokenA] = poolList.length;
 
+            share = Math.sqrt(amountA * amountB);
+
             _mint(to, poolList.length, share, "");
 
             Pool memory newPool = Pool({
@@ -176,10 +178,7 @@ contract BridgeSwap is
 
             isPoolExists[tokenA][tokenB] = true;
             isPoolExists[tokenB][tokenA] = true;
-
-            share = Math.sqrt(amountA * amountB);
         }
-
         emit AddLiquidty(msg.sender, token0, token1, share, to);
     }
 
