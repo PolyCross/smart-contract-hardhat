@@ -307,7 +307,6 @@ contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable
     ) public returns (uint256 amount0, uint256 amount1) {
         if (!isPoolExists[tokenA][tokenB]) revert PoolNotExist();
         uint256 index = poolIndex[tokenA][tokenB];
-        _burn(msg.sender, index, liquidity);
 
         Pool storage targetPool = poolList[index];
         uint256 total = totalSupply(index);
@@ -315,6 +314,8 @@ contract BridgeSwap is IBridgeSwap, ERC1155SupplyUpgradeable, OwnableUpgradeable
         amount1 = (targetPool.reserve1 * liquidity) / total;
         targetPool.reserve0 -= amount0;
         targetPool.reserve1 -= amount1;
+
+        _burn(msg.sender, index, liquidity);
 
         IERC20(targetPool.token0).transfer(to, amount0);
         IERC20(targetPool.token1).transfer(to, amount1);
