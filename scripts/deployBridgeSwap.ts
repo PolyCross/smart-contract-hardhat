@@ -6,7 +6,11 @@ async function main() {
 
   await brigeSwap.waitForDeployment();
 
-  console.log(`The Bridge contract deployed to ${brigeSwap.target}`)
+  console.log(`The Bridge contract deployed to ${brigeSwap.target}`);
+
+  await brigeSwap.Initialize();
+
+  console.log(`The Contract has inited`);
 }
 
 main().catch((error) => {
