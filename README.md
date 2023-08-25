@@ -1,13 +1,13 @@
-# Sample Hardhat Project
+# Introduce
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+The smart contract project of **PolyCross** use Hardhat for deployment and verification.
 
-Try running some of the following tasks:
+## Address
 
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.ts
-```
+#### Sepolia Network
+
+- BridgeSwap: 0x651611eB218D30Ab736c8548F7DB5F5F0b35Fa91
+
+#### Mumbai Network
+
+- BridgeSwap: 0x9652B3320550CeEe00BcA395060fad3419A94DC5
