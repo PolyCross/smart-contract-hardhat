@@ -101,8 +101,8 @@ contract BridgeSwap is
                 ? BridgeSwapLibrary.getAmountOut(amounts[i], reserve0, reserve1)
                 : BridgeSwapLibrary.getAmountOut(
                     amounts[i],
-                    reserve0,
-                    reserve1
+                    reserve1,
+                    reserve0
                 );
 
             amounts[i + 1] = temp_amountOut;
@@ -217,7 +217,8 @@ contract BridgeSwap is
     ) public onlyOwner returns (uint256[] memory amounts) {
         IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
         amounts = _swap(amountIn, path);
-        IERC20(path[path.length - 1]).transfer(to, amounts[amounts.length - 1]);
+        uint256 final_index = path.length - 1;      // gas saving, because path and amounts have the same length
+        IERC20(path[final_index]).transfer(to, amounts[final_index]);
 
         emit BridgeSwapOut(path, amountIn, to);
     }
