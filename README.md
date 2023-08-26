@@ -13,3 +13,9 @@ The smart contract project of **PolyCross** use Hardhat for deployment and verif
 
 - Bridge: [0xfc99C6B880D548f9172EdDe156B9d285F5027dD6](https://mumbai.polygonscan.com/address/0xfc99C6B880D548f9172EdDe156B9d285F5027dD6)
 - BridgeSwap: [0x9652B3320550CeEe00BcA395060fad3419A94DC5](https://mumbai.polygonscan.com/address/0x9652B3320550CeEe00BcA395060fad3419A94DC5)
+
+#### Tokens(both Sepolia and Mumbai have same address)
+
+- TokenA: 0x93B4087485e4eA8F03b4ed17Aa1B2d37640959D8
+- TokenB: 0x43d9cfaE13A9D82D14AB93E5cC673Df6DB7c7a19
+- TokenC: 0x2a6fD1E2DebAbfBb665D36A85aB32D8C36e0F8d7
